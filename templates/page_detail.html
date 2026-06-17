@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}{{ page.name }} — FB Auto-Poster{% endblock %}
+
+{% block content %}
+<!-- Page header -->
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+  <div>
+    <a href="{{ url_for('index') }}" class="text-muted text-decoration-none d-inline-flex align-items-center gap-1 mb-1">
+      <i class="bi bi-arrow-left"></i> Dashboard
+    </a>
+    <h2 class="fw-bold mb-0 d-flex align-items-center gap-2">
+      <i class="bi bi-facebook text-primary"></i>{{ page.name }}
+    </h2>
+    <small class="text-muted">{{ posts|length }} scheduled post(s)</small>
+  </div>
+  <button class="btn btn-primary" data-bs-toggle="collapse" data-bs-target="#addPostPanel" aria-expanded="false">
+    <i class="bi bi-plus-circle me-1"></i>Schedule New Post
+  </button>
+</div>
+
+<!-- ── Add Post Form (collapsible) ─────────────────────────────────────────── -->
+<div class="collapse mb-4" id="addPostPanel">
+<div class="card border-0 shadow-card">
+  <div class="card-header bg-white border-bottom py-3 px-4">
+    <h5 class="fw-bold mb-0"><i class="bi bi-calendar-plus text-primary me-2"></i>New Scheduled Post</h5>
+  </div>
+  <div class="card-body p-4">
+    <form method="post" action="{{ url_for('add_post', page_id=page_id) }}">
+
+      <div class="row g-3">
+        <!-- Post type -->
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Post Type</label>
+          <select class="form-select" name="post_type" id="postTypeSelect">
+            <option value="Text">📝 Text</option>
+            <option value="Text_Background">🎨 Text + Background</option>
+            <option value="Text_Image">🖼 Text + Image</option>
+          </select>
+        </div>
+
+        <!-- Time -->
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Post Time</label>
+          <input type="time" class="form-control" name="time" required />
+        </div>
+
+        <!-- Timezone -->
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Timezone</label>
+          <select class="form-select" name="timezone">
+            {% for tz in tz_options %}
+            <option value="{{ tz }}" {% if tz == 'PKT' %}selected{% endif %}>{{ tz }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Days of week -->
+        <div class="col-12">
+          <label class="form-label fw-semibold">Repeat on Days</label>
+          <div class="d-flex flex-wrap gap-2">
+            {% for day in days_short %}
+            <div class="border rounded-3 px-3 py-2 d-flex align-items-center gap-2" style="cursor:pointer">
+              <input
+                class="form-check-input mt-0"
+                type="checkbox"
+                name="days"
+                value="{{ loop.index0 }}"
+                id="day_{{ loop.index0 }}"
+                checked
+              />
+              <label class="mb-0 fw-semibold" for="day_{{ loop.index0 }}" style="cursor:pointer">{{ day }}</label>
+            </div>
+            {% endfor %}
+          </div>
+          <small class="text-muted mt-1 d-block">Uncheck days to skip them.</small>
+        </div>
+
+        <!-- Text area -->
+        <div class="col-12">
+          <label class="form-label fw-semibold">Post Text</label>
+          <textarea
+            class="form-control"
+            name="text"
+            rows="4"
+            placeholder="Write your post content here…"
+            required
+          ></textarea>
+        </div>
+
+        <!-- Background preset (Text_Background only) -->
+        <div class="col-md-6 d-none" id="bgField">
+          <label class="form-label fw-semibold">Background Preset</label>
+          <select class="form-select" name="background_id">
+            <option value="">— None (plain text) —</option>
+            {% for bg_id, bg_name in backgrounds.items() %}
+            <option value="{{ bg_id }}">{{ bg_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Image URL (Text_Image only) -->
+        <div class="col-md-6 d-none" id="imgField">
+          <label class="form-label fw-semibold">Image URL</label>
+          <input
+            type="url"
+            class="form-control"
+            name="image_url"
+            placeholder="https://example.com/image.jpg"
+          />
+          <small class="text-muted">Direct image link or Google Drive share link.</small>
+        </div>
+
+        <!-- First comment -->
+        <div class="col-12">
+          <label class="form-label fw-semibold">
+            First Comment
+            <span class="text-muted fw-normal">(optional — auto-posted after the post)</span>
+          </label>
+          <input
+            type="text"
+            class="form-control"
+            name="first_comment"
+            placeholder="e.g. Check out our website: …"
+          />
+        </div>
+
+        <div class="col-12 d-flex gap-2">
+          <button type="submit" class="btn btn-success px-4">
+            <i class="bi bi-calendar-check me-1"></i>Schedule Post
+          </button>
+          <button type="button" class="btn btn-outline-secondary"
+                  data-bs-toggle="collapse" data-bs-target="#addPostPanel">
+            Cancel
+          </button>
+        </div>
+      </div><!-- /row -->
+    </form>
+  </div>
+</div>
+</div>
+
+<!-- ── Scheduled Posts List ──────────────────────────────────────────────── -->
+{% if not posts %}
+<div class="card border-0 shadow-card text-center py-5">
+  <i class="bi bi-calendar2-x display-2 text-muted mb-3"></i>
+  <h5 class="text-muted">No posts scheduled yet</h5>
+  <p class="text-muted">Click <strong>Schedule New Post</strong> above to add one.</p>
+</div>
+{% else %}
+<div class="d-flex flex-column gap-3">
+  {% for post in posts %}
+  <div class="card border-0 shadow-card post-card {% if not post.active %}paused{% endif %}" id="card-{{ post.id }}">
+    <div class="card-body py-3 px-4">
+      <div class="row align-items-center g-2">
+
+        <!-- Left: info -->
+        <div class="col">
+          <!-- Type badge + time + days -->
+          <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+            <span class="badge badge-{{ post.post_type }}">
+              {{ post.post_type | replace('_', ' ') }}
+            </span>
+            <span class="text-muted small">
+              <i class="bi bi-clock me-1"></i>{{ post.time }} {{ post.timezone }}
+            </span>
+            {% for d in post.days %}
+            <span class="day-pill">{{ days_short[d] }}</span>
+            {% endfor %}
+            {% if post.active %}
+            <span class="badge bg-success-subtle text-success border border-success-subtle">
+              <span class="status-dot active me-1"></span>Active
+            </span>
+            {% else %}
+            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+              <span class="status-dot paused me-1"></span>Paused
+            </span>
+            {% endif %}
+          </div>
+
+          <!-- Post text preview -->
+          <p class="mb-1 text-truncate" style="max-width:600px;">
+            {{ post.text[:200] }}{% if post.text|length > 200 %}…{% endif %}
+          </p>
+
+          <!-- Optional metadata -->
+          <div class="d-flex flex-wrap gap-3 mt-1">
+            {% if post.first_comment %}
+            <small class="text-muted">
+              <i class="bi bi-chat-dots me-1"></i>Comment: {{ post.first_comment[:60] }}
+            </small>
+            {% endif %}
+            {% if post.background_id and post.post_type == 'Text_Background' %}
+            <small class="text-muted">
+              <i class="bi bi-palette me-1"></i>BG: {{ backgrounds.get(post.background_id, post.background_id) }}
+            </small>
+            {% endif %}
+            {% if post.image_url and post.post_type == 'Text_Image' %}
+            <small class="text-muted">
+              <i class="bi bi-image me-1"></i>Image attached
+            </small>
+            {% endif %}
+            {% if post.last_posted %}
+            <small class="text-success">
+              <i class="bi bi-check-circle me-1"></i>Last posted: {{ post.last_posted }}
+            </small>
+            {% endif %}
+            {% if post.created_at %}
+            <small class="text-muted">
+              <i class="bi bi-plus-circle me-1"></i>Created: {{ post.created_at }}
+            </small>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Right: actions -->
+        <div class="col-auto d-flex gap-2">
+          <a href="{{ url_for('edit_post', post_id=post.id) }}"
+             class="btn btn-sm btn-outline-primary" title="Edit post">
+            <i class="bi bi-pencil"></i>
+          </a>
+          <button
+            class="btn btn-sm btn-outline-secondary toggle-btn"
+            data-post-id="{{ post.id }}"
+            data-active="{{ 'true' if post.active else 'false' }}"
+            title="{{ 'Pause post' if post.active else 'Resume post' }}"
+          >
+            <i class="bi bi-{{ 'pause-fill' if post.active else 'play-fill' }}"></i>
+          </button>
+          <form method="post" action="{{ url_for('delete_post', post_id=post.id) }}"
+                onsubmit="return confirm('Delete this scheduled post?')">
+            <button class="btn btn-sm btn-outline-danger" title="Delete post">
+              <i class="bi bi-trash3"></i>
+            </button>
+          </form>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ── Show/hide background & image fields based on post type ── */
+const typeSelect = document.getElementById('postTypeSelect');
+const bgField    = document.getElementById('bgField');
+const imgField   = document.getElementById('imgField');
+
+function syncTypeFields() {
+  const val = typeSelect.value;
+  bgField.classList.toggle('d-none',  val !== 'Text_Background');
+  imgField.classList.toggle('d-none', val !== 'Text_Image');
+}
+typeSelect.addEventListener('change', syncTypeFields);
+syncTypeFields();
+
+/* ── Toggle active/paused via AJAX ── */
+document.querySelectorAll('.toggle-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const postId = btn.dataset.postId;
+    const res    = await fetch(`/posts/${postId}/toggle`, { method: 'POST' });
+    const data   = await res.json();
+    if (data.ok) {
+      const card = document.getElementById(`card-${postId}`);
+      const icon = btn.querySelector('i');
+      if (data.active) {
+        card.classList.remove('paused');
+        icon.className = 'bi bi-pause-fill';
+        btn.title      = 'Pause post';
+        btn.closest('.card-body').querySelector('.badge.bg-secondary-subtle')
+          ?.setAttribute('class', 'badge bg-success-subtle text-success border border-success-subtle');
+      } else {
+        card.classList.add('paused');
+        icon.className = 'bi bi-play-fill';
+        btn.title      = 'Resume post';
+      }
+      /* Simple reload to refresh badge text properly */
+      location.reload();
+    }
+  });
+});
+</script>
+{% endblock %}

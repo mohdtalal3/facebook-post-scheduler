@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — FB Auto-Poster</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+  <style>
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1877f2 0%, #0a5dc2 50%, #042d6e 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-card {
+      width: 100%;
+      max-width: 400px;
+      border-radius: 16px !important;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35) !important;
+    }
+    .brand-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #1877f2, #0a5dc2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      color: #fff;
+      margin: 0 auto 1rem;
+    }
+    .btn-login {
+      background: linear-gradient(135deg, #1877f2, #0a5dc2);
+      border: none;
+      color: #fff;
+      font-weight: 600;
+      letter-spacing: .03em;
+    }
+    .btn-login:hover { background: linear-gradient(135deg, #0a5dc2, #042d6e); color: #fff; }
+    .shake { animation: shake .4s ease; }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20%,60%  { transform: translateX(-6px); }
+      40%,80%  { transform: translateX(6px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-card card border-0 p-4 p-md-5">
+    <!-- Brand -->
+    <div class="text-center mb-4">
+      <div class="brand-icon"><i class="bi bi-facebook"></i></div>
+      <h4 class="fw-bold mb-0">FB Auto-Poster</h4>
+      <p class="text-muted small mt-1">Sign in to manage your pages</p>
+    </div>
+
+    <!-- Error alert -->
+    {% if error %}
+    <div class="alert alert-danger d-flex align-items-center gap-2 shake py-2">
+      <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+      <div>{{ error }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Login form -->
+    <form method="post" autocomplete="off">
+      <input type="hidden" name="next" value="{{ next }}" />
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold text-secondary small text-uppercase ls-1">Password</label>
+        <div class="input-group">
+          <span class="input-group-text bg-light border-end-0">
+            <i class="bi bi-lock text-muted"></i>
+          </span>
+          <input
+            type="password"
+            name="password"
+            id="passwordInput"
+            class="form-control border-start-0 ps-0"
+            placeholder="Enter your password"
+            autofocus
+            required
+          />
+          <button
+            type="button"
+            class="btn btn-outline-secondary"
+            id="togglePwd"
+            title="Show / hide"
+          >
+            <i class="bi bi-eye"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="d-grid mt-4">
+        <button type="submit" class="btn btn-login btn-lg">
+          <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+        </button>
+      </div>
+    </form>
+
+    <p class="text-center text-muted small mt-4 mb-0">
+      Session stays active for <strong>30 days</strong>.
+    </p>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const pwd    = document.getElementById('passwordInput');
+    const toggle = document.getElementById('togglePwd');
+    toggle.addEventListener('click', () => {
+      const show = pwd.type === 'password';
+      pwd.type   = show ? 'text' : 'password';
+      toggle.querySelector('i').className = show ? 'bi bi-eye-slash' : 'bi bi-eye';
+    });
+  </script>
+</body>
+</html>

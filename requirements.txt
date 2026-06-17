@@ -1,0 +1,6 @@
+flask
+requests
+python-dotenv
+apscheduler
+google-auth
+google-api-python-client

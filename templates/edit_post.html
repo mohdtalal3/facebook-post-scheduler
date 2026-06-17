@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}Edit Post — {{ page.name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-lg-8">
+
+  <!-- Breadcrumb -->
+  <nav class="mb-3">
+    <a href="{{ url_for('index') }}" class="text-muted text-decoration-none">
+      <i class="bi bi-house me-1"></i>Dashboard
+    </a>
+    <span class="text-muted mx-1">/</span>
+    <a href="{{ url_for('page_detail', page_id=page_id) }}" class="text-muted text-decoration-none">
+      <i class="bi bi-facebook me-1"></i>{{ page.name }}
+    </a>
+    <span class="text-muted mx-1">/</span>
+    <span class="text-dark fw-semibold">Edit Post</span>
+  </nav>
+
+  <div class="card border-0 shadow-card">
+    <div class="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center gap-2">
+      <i class="bi bi-pencil-square text-primary fs-5"></i>
+      <h5 class="fw-bold mb-0">Edit Scheduled Post</h5>
+      <span class="badge bg-secondary ms-auto font-monospace" style="font-size:.7rem;">
+        {{ post.id[:8] }}…
+      </span>
+    </div>
+
+    <div class="card-body p-4">
+      <form method="post">
+
+        <div class="row g-3">
+          <!-- Post type -->
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">Post Type</label>
+            <select class="form-select" name="post_type" id="postTypeSelect">
+              <option value="Text"            {% if post.post_type == 'Text'            %}selected{% endif %}>📝 Text</option>
+              <option value="Text_Background" {% if post.post_type == 'Text_Background' %}selected{% endif %}>🎨 Text + Background</option>
+              <option value="Text_Image"      {% if post.post_type == 'Text_Image'      %}selected{% endif %}>🖼 Text + Image</option>
+            </select>
+          </div>
+
+          <!-- Time -->
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">Post Time</label>
+            <input
+              type="time"
+              class="form-control"
+              name="time"
+              value="{{ post.time }}"
+              required
+            />
+          </div>
+
+          <!-- Timezone -->
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">Timezone</label>
+            <select class="form-select" name="timezone">
+              {% for tz in tz_options %}
+              <option value="{{ tz }}" {% if tz == post.timezone %}selected{% endif %}>{{ tz }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Days of week -->
+          <div class="col-12">
+            <label class="form-label fw-semibold">Repeat on Days</label>
+            <div class="d-flex flex-wrap gap-2">
+              {% for day in days_short %}
+              <div class="border rounded-3 px-3 py-2 d-flex align-items-center gap-2" style="cursor:pointer">
+                <input
+                  class="form-check-input mt-0"
+                  type="checkbox"
+                  name="days"
+                  value="{{ loop.index0 }}"
+                  id="day_{{ loop.index0 }}"
+                  {% if loop.index0 in post.days %}checked{% endif %}
+                />
+                <label class="mb-0 fw-semibold" for="day_{{ loop.index0 }}" style="cursor:pointer">{{ day }}</label>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Text -->
+          <div class="col-12">
+            <label class="form-label fw-semibold">Post Text</label>
+            <textarea
+              class="form-control"
+              name="text"
+              rows="5"
+              required
+            >{{ post.text }}</textarea>
+          </div>
+
+          <!-- Background preset -->
+          <div class="col-md-6 {% if post.post_type != 'Text_Background' %}d-none{% endif %}" id="bgField">
+            <label class="form-label fw-semibold">Background Preset</label>
+            <select class="form-select" name="background_id">
+              <option value="">— None (plain text) —</option>
+              {% for bg_id, bg_name in backgrounds.items() %}
+              <option value="{{ bg_id }}" {% if bg_id == post.background_id %}selected{% endif %}>
+                {{ bg_name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Image URL -->
+          <div class="col-md-6 {% if post.post_type != 'Text_Image' %}d-none{% endif %}" id="imgField">
+            <label class="form-label fw-semibold">Image URL</label>
+            <input
+              type="url"
+              class="form-control"
+              name="image_url"
+              value="{{ post.image_url }}"
+              placeholder="https://example.com/image.jpg"
+            />
+            <small class="text-muted">Direct image link or Google Drive share link.</small>
+          </div>
+
+          <!-- First comment -->
+          <div class="col-12">
+            <label class="form-label fw-semibold">
+              First Comment
+              <span class="text-muted fw-normal">(optional)</span>
+            </label>
+            <input
+              type="text"
+              class="form-control"
+              name="first_comment"
+              value="{{ post.first_comment }}"
+              placeholder="e.g. Check out our website: …"
+            />
+          </div>
+
+          <!-- Metadata row -->
+          {% if post.last_posted or post.created_at %}
+          <div class="col-12">
+            <div class="d-flex flex-wrap gap-3 text-muted small">
+              {% if post.created_at %}
+              <span><i class="bi bi-plus-circle me-1"></i>Created: {{ post.created_at }}</span>
+              {% endif %}
+              {% if post.last_posted %}
+              <span class="text-success"><i class="bi bi-check-circle me-1"></i>Last posted: {{ post.last_posted }}</span>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Actions -->
+          <div class="col-12 d-flex gap-2 pt-2 border-top">
+            <button type="submit" class="btn btn-primary px-4">
+              <i class="bi bi-floppy me-1"></i>Save Changes
+            </button>
+            <a href="{{ url_for('page_detail', page_id=page_id) }}"
+               class="btn btn-outline-secondary">
+              Cancel
+            </a>
+          </div>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const typeSelect = document.getElementById('postTypeSelect');
+  const bgField    = document.getElementById('bgField');
+  const imgField   = document.getElementById('imgField');
+
+  function syncTypeFields() {
+    const val = typeSelect.value;
+    bgField.classList.toggle('d-none',  val !== 'Text_Background');
+    imgField.classList.toggle('d-none', val !== 'Text_Image');
+  }
+  typeSelect.addEventListener('change', syncTypeFields);
+  syncTypeFields();
+</script>
+{% endblock %}

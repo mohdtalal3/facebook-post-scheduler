@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Add Page — FB Auto-Poster{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-lg-7">
+
+  <!-- Back link -->
+  <a href="{{ url_for('index') }}" class="text-muted text-decoration-none d-inline-flex align-items-center gap-1 mb-3">
+    <i class="bi bi-arrow-left"></i> Back to Dashboard
+  </a>
+
+  <!-- ── Step 1: Fetch ─────────────────────────────────────────────────────── -->
+  <div class="card border-0 shadow-card mb-4">
+    <div class="card-header bg-white border-bottom py-3 px-4">
+      <h5 class="fw-bold mb-0">
+        <span class="badge bg-primary rounded-circle me-2">1</span>
+        Connect Facebook Pages
+      </h5>
+    </div>
+    <div class="card-body p-4">
+      {% if error %}
+      <div class="alert alert-danger d-flex align-items-center gap-2">
+        <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+        <div>{{ error }}</div>
+      </div>
+      {% endif %}
+
+      {% if has_env_token %}
+      <div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3">
+        <i class="bi bi-shield-check flex-shrink-0"></i>
+        <div><strong>Saved token detected</strong> — leave the field below blank to use it automatically.</div>
+      </div>
+      {% endif %}
+
+      <form method="post">
+        <input type="hidden" name="action" value="fetch" />
+        <label class="form-label fw-semibold">Facebook User Access Token</label>
+        <div class="input-group mb-2">
+          <span class="input-group-text bg-white"><i class="bi bi-key text-primary"></i></span>
+          <input
+            type="password"
+            name="user_token"
+            id="tokenInput"
+            class="form-control font-monospace"
+            placeholder="{% if has_env_token %}Leave blank to use saved token from .env{% else %}EAAxxxxxxxx…{% endif %}"
+            {% if not has_env_token %}required{% endif %}
+          />
+          <button type="button" class="btn btn-outline-secondary" id="toggleToken" title="Show/hide">
+            <i class="bi bi-eye"></i>
+          </button>
+          <button class="btn btn-primary" type="submit">
+            <i class="bi bi-arrow-clockwise me-1"></i>Fetch Pages
+          </button>
+        </div>
+        <small class="text-muted">
+          Used once to fetch your page list. Page tokens are stored server-side and never shown in the browser.
+        </small>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Step 2: Select pages (shown only after fetch) ────────────────────── -->
+  {% if fb_pages %}
+  <div class="card border-0 shadow-card">
+    <div class="card-header bg-white border-bottom py-3 px-4">
+      <h5 class="fw-bold mb-0">
+        <span class="badge bg-success rounded-circle me-2">2</span>
+        Select Pages to Add
+        <span class="badge bg-secondary ms-2">{{ fb_pages|length }} found</span>
+      </h5>
+    </div>
+    <div class="card-body p-4">
+      <form method="post">
+        <input type="hidden" name="action" value="save" />
+
+        {% for page in fb_pages %}
+        <!-- Only name is needed — tokens are held in server session -->
+        <input type="hidden" name="name_{{ page.id }}" value="{{ page.name }}" />
+
+        <div class="card mb-3 border">
+          <div class="card-body py-3 px-3 d-flex align-items-center gap-3">
+            <div class="form-check mb-0">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                name="page_ids"
+                value="{{ page.id }}"
+                id="pg_{{ page.id }}"
+                checked
+              />
+            </div>
+            <div class="rounded-3 bg-primary text-white d-flex align-items-center
+                        justify-content-center flex-shrink-0" style="width:40px;height:40px">
+              <i class="bi bi-facebook"></i>
+            </div>
+            <label class="form-check-label flex-grow-1 mb-0" for="pg_{{ page.id }}">
+              <strong class="d-block">{{ page.name }}</strong>
+              <small class="text-muted font-monospace">ID: {{ page.id }}</small>
+            </label>
+            <span class="badge bg-success-subtle text-success border border-success-subtle">
+              <i class="bi bi-check-circle me-1"></i>Token secured
+            </span>
+          </div>
+        </div>
+        {% endfor %}
+
+        <div class="d-flex gap-2 mt-3">
+          <button class="btn btn-success px-4" type="submit">
+            <i class="bi bi-floppy me-1"></i>Save Selected Pages
+          </button>
+          <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const tokenInput  = document.getElementById('tokenInput');
+  const toggleToken = document.getElementById('toggleToken');
+  toggleToken.addEventListener('click', () => {
+    const show = tokenInput.type === 'password';
+    tokenInput.type = show ? 'text' : 'password';
+    toggleToken.querySelector('i').className = show ? 'bi bi-eye-slash' : 'bi bi-eye';
+  });
+</script>
+{% endblock %}
