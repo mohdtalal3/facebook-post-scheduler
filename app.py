@@ -20,6 +20,7 @@ from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
 
 import requests
+from wordpress_data import get_wp_post_data
 from google.oauth2 import service_account
 from googleapiclient.discovery import build as google_build
 from googleapiclient.http import MediaIoBaseDownload
@@ -282,6 +283,18 @@ def execute_post_thread(post: dict, page_name: str, token: str):
             result = fb_post_text_background(page_id, token, text, background_id)
         elif post_type == "Text_Image" and image_url:
             result = fb_post_photo(page_id, token, text, image_url)
+        elif post_type == "URL":
+            source_url = post.get("source_url", "").strip()
+            url_data   = get_wp_post_data(source_url)
+            text       = url_data["title"]
+            link       = url_data.get("link", "")
+            img        = url_data.get("image")
+            if not first_comment and link:
+                first_comment = link
+            if img:
+                result = fb_post_photo(page_id, token, text, img)
+            else:
+                result = fb_post_text(page_id, token, text)
         else:
             result = fb_post_text(page_id, token, text)
 
@@ -597,6 +610,7 @@ def add_post(page_id):
         "background_id": request.form.get("background_id", "").strip(),
         "image_url":     request.form.get("image_url", "").strip(),
         "first_comment": request.form.get("first_comment", "").strip(),
+        "source_url":    request.form.get("source_url", "").strip(),
         "active":        True,
         "last_posted":   None,
         "created_at":    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -631,6 +645,7 @@ def edit_post(post_id):
         post["background_id"] = request.form.get("background_id", "").strip()
         post["image_url"]     = request.form.get("image_url", "").strip()
         post["first_comment"] = request.form.get("first_comment", "").strip()
+        post["source_url"]    = request.form.get("source_url", "").strip()
         save_schedule(sched)
         _schedule_post_job(post)
         flash("Post updated!", "success")
@@ -658,6 +673,19 @@ def toggle_post(post_id):
             _schedule_post_job(p)
             return jsonify({"ok": True, "active": p["active"]})
     return jsonify({"ok": False}), 404
+
+
+@app.route("/api/fetch-url")
+@login_required
+def api_fetch_url():
+    url = request.args.get("url", "").strip()
+    if not url:
+        return jsonify({"error": "No URL provided"}), 400
+    try:
+        data = get_wp_post_data(url)
+        return jsonify({"ok": True, "title": data["title"], "image": data["image"], "link": data["link"]})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
 
 
 @app.route("/posts/<post_id>/delete", methods=["POST"])

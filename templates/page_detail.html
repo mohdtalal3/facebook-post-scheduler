@@ -35,6 +35,7 @@
             <option value="Text">📝 Text</option>
             <option value="Text_Background">🎨 Text + Background</option>
             <option value="Text_Image">🖼 Text + Image</option>
+            <option value="URL">🔗 URL Post</option>
           </select>
         </div>
 
@@ -75,15 +76,39 @@
           <small class="text-muted mt-1 d-block">Uncheck days to skip them.</small>
         </div>
 
+        <!-- URL Post field -->
+        <div class="col-12 d-none" id="urlField">
+          <label class="form-label fw-semibold">WordPress / Post URL</label>
+          <div class="input-group">
+            <input type="url" class="form-control" id="sourceUrlInput"
+                   name="source_url" placeholder="https://yoursite.com/post-slug/" />
+            <button type="button" class="btn btn-outline-primary" id="fetchUrlBtn">
+              <i class="bi bi-search me-1"></i>Fetch
+            </button>
+          </div>
+          <!-- Preview card -->
+          <div id="urlPreview" class="d-none mt-3 p-3 border rounded-3 bg-light">
+            <div class="d-flex gap-3 align-items-start">
+              <img id="urlPreviewImg" src="" alt="" class="rounded" style="width:80px;height:80px;object-fit:cover;flex-shrink:0;">
+              <div class="flex-grow-1 overflow-hidden">
+                <div class="fw-semibold" id="urlPreviewTitle"></div>
+                <small class="text-muted text-truncate d-block" id="urlPreviewLink"></small>
+                <small class="text-success mt-1 d-block"><i class="bi bi-check-circle me-1"></i>Title will be used as post text · Link posted as first comment</small>
+              </div>
+            </div>
+          </div>
+          <div id="urlError" class="text-danger small mt-1 d-none"></div>
+        </div>
+
         <!-- Text area -->
-        <div class="col-12">
+        <div class="col-12" id="textField">
           <label class="form-label fw-semibold">Post Text</label>
           <textarea
             class="form-control"
             name="text"
+            id="postTextArea"
             rows="4"
             placeholder="Write your post content here…"
-            required
           ></textarea>
         </div>
 
@@ -111,15 +136,16 @@
         </div>
 
         <!-- First comment -->
-        <div class="col-12">
+        <div class="col-12" id="firstCommentField">
           <label class="form-label fw-semibold">
             First Comment
-            <span class="text-muted fw-normal">(optional — auto-posted after the post)</span>
+            <span class="text-muted fw-normal" id="firstCommentHint">(optional — auto-posted after the post)</span>
           </label>
           <input
             type="text"
             class="form-control"
             name="first_comment"
+            id="firstCommentInput"
             placeholder="e.g. Check out our website: …"
           />
         </div>
@@ -178,13 +204,19 @@
           </div>
 
           <!-- Post text preview -->
+          {% if post.post_type == 'URL' and post.source_url %}
+          <p class="mb-1 text-truncate text-muted" style="max-width:600px;">
+            <i class="bi bi-link-45deg me-1"></i>{{ post.source_url }}
+          </p>
+          {% else %}
           <p class="mb-1 text-truncate" style="max-width:600px;">
             {{ post.text[:200] }}{% if post.text|length > 200 %}…{% endif %}
           </p>
+          {% endif %}
 
           <!-- Optional metadata -->
           <div class="d-flex flex-wrap gap-3 mt-1">
-            {% if post.first_comment %}
+            {% if post.first_comment and post.post_type != 'URL' %}
             <small class="text-muted">
               <i class="bi bi-chat-dots me-1"></i>Comment: {{ post.first_comment[:60] }}
             </small>
@@ -244,18 +276,68 @@
 
 {% block scripts %}
 <script>
-/* ── Show/hide background & image fields based on post type ── */
-const typeSelect = document.getElementById('postTypeSelect');
-const bgField    = document.getElementById('bgField');
-const imgField   = document.getElementById('imgField');
+/* ── Show/hide fields based on post type ── */
+const typeSelect        = document.getElementById('postTypeSelect');
+const bgField           = document.getElementById('bgField');
+const imgField          = document.getElementById('imgField');
+const urlField          = document.getElementById('urlField');
+const textField         = document.getElementById('textField');
+const postTextArea      = document.getElementById('postTextArea');
+const firstCommentHint  = document.getElementById('firstCommentHint');
+const firstCommentInput = document.getElementById('firstCommentInput');
 
 function syncTypeFields() {
   const val = typeSelect.value;
-  bgField.classList.toggle('d-none',  val !== 'Text_Background');
-  imgField.classList.toggle('d-none', val !== 'Text_Image');
+  bgField.classList.toggle('d-none',   val !== 'Text_Background');
+  imgField.classList.toggle('d-none',  val !== 'Text_Image');
+  urlField.classList.toggle('d-none',  val !== 'URL');
+  textField.classList.toggle('d-none', val === 'URL');
+  postTextArea.required = (val !== 'URL');
+  if (val === 'URL') {
+    firstCommentHint.textContent = '(auto-filled with article link — editable)';
+  } else {
+    firstCommentHint.textContent = '(optional — auto-posted after the post)';
+  }
 }
 typeSelect.addEventListener('change', syncTypeFields);
 syncTypeFields();
+
+/* ── Fetch URL preview ── */
+document.getElementById('fetchUrlBtn').addEventListener('click', async () => {
+  const url      = document.getElementById('sourceUrlInput').value.trim();
+  const preview  = document.getElementById('urlPreview');
+  const errBox   = document.getElementById('urlError');
+  const btn      = document.getElementById('fetchUrlBtn');
+  if (!url) return;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  preview.classList.add('d-none');
+  errBox.classList.add('d-none');
+  try {
+    const res  = await fetch(`/api/fetch-url?url=${encodeURIComponent(url)}`);
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById('urlPreviewTitle').textContent = data.title || '';
+      document.getElementById('urlPreviewLink').textContent  = data.link  || '';
+      const img = document.getElementById('urlPreviewImg');
+      if (data.image) { img.src = data.image; img.classList.remove('d-none'); }
+      else { img.classList.add('d-none'); }
+      if (!firstCommentInput.value && data.link) {
+        firstCommentInput.value = data.link;
+      }
+      preview.classList.remove('d-none');
+    } else {
+      errBox.textContent = data.error || 'Failed to fetch URL';
+      errBox.classList.remove('d-none');
+    }
+  } catch(e) {
+    errBox.textContent = 'Network error';
+    errBox.classList.remove('d-none');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-search me-1"></i>Fetch';
+  }
+});
 
 /* ── Toggle active/paused via AJAX ── */
 document.querySelectorAll('.toggle-btn').forEach(btn => {

@@ -38,6 +38,7 @@
               <option value="Text"            {% if post.post_type == 'Text'            %}selected{% endif %}>📝 Text</option>
               <option value="Text_Background" {% if post.post_type == 'Text_Background' %}selected{% endif %}>🎨 Text + Background</option>
               <option value="Text_Image"      {% if post.post_type == 'Text_Image'      %}selected{% endif %}>🖼 Text + Image</option>
+              <option value="URL"             {% if post.post_type == 'URL'             %}selected{% endif %}>🔗 URL Post</option>
             </select>
           </div>
 
@@ -83,14 +84,39 @@
             </div>
           </div>
 
+          <!-- URL Post field -->
+          <div class="col-12 d-none" id="urlField">
+            <label class="form-label fw-semibold">WordPress / Post URL</label>
+            <div class="input-group">
+              <input type="url" class="form-control" id="sourceUrlInput"
+                     name="source_url"
+                     value="{{ post.source_url or '' }}"
+                     placeholder="https://yoursite.com/post-slug/" />
+              <button type="button" class="btn btn-outline-primary" id="fetchUrlBtn">
+                <i class="bi bi-search me-1"></i>Fetch
+              </button>
+            </div>
+            <div id="urlPreview" class="d-none mt-3 p-3 border rounded-3 bg-light">
+              <div class="d-flex gap-3 align-items-start">
+                <img id="urlPreviewImg" src="" alt="" class="rounded" style="width:80px;height:80px;object-fit:cover;flex-shrink:0;">
+                <div class="flex-grow-1 overflow-hidden">
+                  <div class="fw-semibold" id="urlPreviewTitle"></div>
+                  <small class="text-muted text-truncate d-block" id="urlPreviewLink"></small>
+                  <small class="text-success mt-1 d-block"><i class="bi bi-check-circle me-1"></i>Title will be used as post text · Link posted as first comment</small>
+                </div>
+              </div>
+            </div>
+            <div id="urlError" class="text-danger small mt-1 d-none"></div>
+          </div>
+
           <!-- Text -->
-          <div class="col-12">
+          <div class="col-12" id="textField">
             <label class="form-label fw-semibold">Post Text</label>
             <textarea
               class="form-control"
               name="text"
+              id="postTextArea"
               rows="5"
-              required
             >{{ post.text }}</textarea>
           </div>
 
@@ -171,16 +197,59 @@
 
 {% block scripts %}
 <script>
-  const typeSelect = document.getElementById('postTypeSelect');
-  const bgField    = document.getElementById('bgField');
-  const imgField   = document.getElementById('imgField');
+  const typeSelect        = document.getElementById('postTypeSelect');
+  const bgField           = document.getElementById('bgField');
+  const imgField          = document.getElementById('imgField');
+  const urlField          = document.getElementById('urlField');
+  const textField         = document.getElementById('textField');
+  const postTextArea      = document.getElementById('postTextArea');
+  const firstCommentInput = document.querySelector('input[name="first_comment"]');
 
   function syncTypeFields() {
     const val = typeSelect.value;
-    bgField.classList.toggle('d-none',  val !== 'Text_Background');
-    imgField.classList.toggle('d-none', val !== 'Text_Image');
+    bgField.classList.toggle('d-none',   val !== 'Text_Background');
+    imgField.classList.toggle('d-none',  val !== 'Text_Image');
+    urlField.classList.toggle('d-none',  val !== 'URL');
+    textField.classList.toggle('d-none', val === 'URL');
+    postTextArea.required = (val !== 'URL');
   }
   typeSelect.addEventListener('change', syncTypeFields);
   syncTypeFields();
+
+  document.getElementById('fetchUrlBtn').addEventListener('click', async () => {
+    const url     = document.getElementById('sourceUrlInput').value.trim();
+    const preview = document.getElementById('urlPreview');
+    const errBox  = document.getElementById('urlError');
+    const btn     = document.getElementById('fetchUrlBtn');
+    if (!url) return;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    preview.classList.add('d-none');
+    errBox.classList.add('d-none');
+    try {
+      const res  = await fetch(`/api/fetch-url?url=${encodeURIComponent(url)}`);
+      const data = await res.json();
+      if (data.ok) {
+        document.getElementById('urlPreviewTitle').textContent = data.title || '';
+        document.getElementById('urlPreviewLink').textContent  = data.link  || '';
+        const img = document.getElementById('urlPreviewImg');
+        if (data.image) { img.src = data.image; img.classList.remove('d-none'); }
+        else            { img.classList.add('d-none'); }
+        if (!firstCommentInput.value && data.link) {
+          firstCommentInput.value = data.link;
+        }
+        preview.classList.remove('d-none');
+      } else {
+        errBox.textContent = data.error || 'Failed to fetch URL';
+        errBox.classList.remove('d-none');
+      }
+    } catch(e) {
+      errBox.textContent = 'Network error';
+      errBox.classList.remove('d-none');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-search me-1"></i>Fetch';
+    }
+  });
 </script>
 {% endblock %}
