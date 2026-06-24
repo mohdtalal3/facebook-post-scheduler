@@ -49,7 +49,7 @@ def get_wp_post_data(post_url):
     }
 
 
-# # Example
+# # # Example
 # url = "https://www.aisleofshame.com/new-and-returning-items-of-the-week-at-trader-joes-2/"
 
 # data = get_wp_post_data(url)

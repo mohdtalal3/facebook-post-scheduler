@@ -353,14 +353,22 @@ _ap_scheduler = BackgroundScheduler(timezone="UTC")
 _DAY_MAP      = {0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri", 5: "sat", 6: "sun"}
 
 
-def _make_cron_trigger(post: dict) -> CronTrigger:
-    time_str = post.get("time", "00:00").strip()
+def _get_post_times(post: dict) -> list:
+    """Return list of time strings. Supports new 'times' list and old single 'time'."""
+    times = post.get("times")
+    if times and isinstance(times, list):
+        return [t for t in times if t]
+    single = post.get("time", "").strip()
+    return [single] if single else ["09:00"]
+
+
+def _make_cron_trigger(post: dict, time_str: str) -> CronTrigger:
     tz_name  = normalize_tz(post.get("timezone", "UTC"))
     days     = post.get("days", list(range(7)))
     parsed   = None
     for fmt in ("%H:%M", "%I:%M %p"):
         try:
-            parsed = datetime.strptime(time_str, fmt)
+            parsed = datetime.strptime(time_str.strip(), fmt)
             break
         except ValueError:
             pass
@@ -392,32 +400,37 @@ def _execute_scheduled_post(post_id: str):
 
 
 def _schedule_post_job(post: dict):
-    """Add or replace a post's cron job. Removes it if inactive."""
-    job_id = f"post_{post['id']}"
+    """Add or replace cron jobs for a post — one per time slot."""
+    _unschedule_post_job(post["id"])
     if not post.get("active", True):
-        _unschedule_post_job(post["id"])
         return
-    try:
-        trigger = _make_cron_trigger(post)
-        _ap_scheduler.add_job(
-            _execute_scheduled_post,
-            trigger,
-            args=[post["id"]],
-            id=job_id,
-            name=f"Post → {post['page_id']}",
-            replace_existing=True,
-            coalesce=True,
-            misfire_grace_time=59,
-        )
-    except Exception as exc:
-        print(f"[Scheduler] Could not schedule post {post['id']}: {exc}")
+    times = _get_post_times(post)
+    for i, time_str in enumerate(times):
+        job_id = f"post_{post['id']}_{i}"
+        try:
+            trigger = _make_cron_trigger(post, time_str)
+            _ap_scheduler.add_job(
+                _execute_scheduled_post,
+                trigger,
+                args=[post["id"]],
+                id=job_id,
+                name=f"Post → {post['page_id']} @ {time_str}",
+                replace_existing=True,
+                coalesce=True,
+                misfire_grace_time=59,
+            )
+        except Exception as exc:
+            print(f"[Scheduler] Could not schedule post {post['id']} @ {time_str}: {exc}")
 
 
 def _unschedule_post_job(post_id: str):
-    try:
-        _ap_scheduler.remove_job(f"post_{post_id}")
-    except Exception:
-        pass
+    prefix = f"post_{post_id}"
+    for job in _ap_scheduler.get_jobs():
+        if job.id == prefix or job.id.startswith(prefix + "_"):
+            try:
+                job.remove()
+            except Exception:
+                pass
 
 
 def reload_all_post_jobs():
@@ -596,15 +609,19 @@ def add_post(page_id):
         flash("Page not found.", "danger")
         return redirect(url_for("index"))
 
-    days_raw = request.form.getlist("days")
-    days     = [int(d) for d in days_raw if d.isdigit()]
+    days_raw  = request.form.getlist("days")
+    days      = [int(d) for d in days_raw if d.isdigit()]
+    raw_times = [t.strip() for t in request.form.getlist("times") if t.strip()]
+    if not raw_times:
+        flash("Please set at least one post time.", "danger")
+        return redirect(url_for("page_detail", page_id=page_id))
 
     post = {
         "id":            str(uuid.uuid4()),
         "page_id":       page_id,
         "post_type":     request.form.get("post_type", "Text"),
         "text":          request.form.get("text", "").strip(),
-        "time":          request.form.get("time", "").strip(),
+        "times":         raw_times,
         "timezone":      request.form.get("timezone", "UTC"),
         "days":          days,
         "background_id": request.form.get("background_id", "").strip(),
@@ -637,9 +654,13 @@ def edit_post(post_id):
 
     if request.method == "POST":
         days_raw = request.form.getlist("days")
+        raw_times = [t.strip() for t in request.form.getlist("times") if t.strip()]
+        if not raw_times:
+            flash("Please set at least one post time.", "danger")
+            return redirect(url_for("edit_post", post_id=post_id))
         post["post_type"]     = request.form.get("post_type", "Text")
         post["text"]          = request.form.get("text", "").strip()
-        post["time"]          = request.form.get("time", "").strip()
+        post["times"]         = raw_times
         post["timezone"]      = request.form.get("timezone", "UTC")
         post["days"]          = [int(d) for d in days_raw if d.isdigit()]
         post["background_id"] = request.form.get("background_id", "").strip()
